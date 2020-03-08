@@ -43,7 +43,7 @@ void* put(hash_table* hash, char* key, void* value)
 	}
 
 	node = malloc(sizeof(hash_node) + strlen(key) + 1);
-	strcpy(node->key, key);
+	node->key = key;
 	node->value = value;
 
 	node->next = hash->storage[key_hashed];
@@ -89,6 +89,7 @@ void* erase(hash_table* hash, char* key)
 			{
 				hash->storage[key_hashed] = node->next;
 			}
+			free(node->key);
 			free(node);
 			node = NULL;
 			hash->size--;
@@ -98,5 +99,58 @@ void* erase(hash_table* hash, char* key)
 		node = node->next;
 	}
 	return NULL;
+}
+
+void list_keys(hash_table* hasht, char** k, size_t len)
+{
+	if(len < hasht->size)
+		return;
+	int ki = 0;
+	int i = hasht->capacity;
+	while(--i >= 0)
+	{
+		hash_node* e = hasht->storage[i];
+		while(e)
+		{
+			k[ki++] = e->key;
+			e = e->next;
+		}
+	}
+}
+
+void list_values(hash_table* hasht, void** v, size_t len)
+{
+	if(len < hasht->size)
+		return;
+	int vi = 0;
+	int i = hasht->capacity;
+	while(--i >= 0)
+	{
+		hash_node* e = hasht->storage[i];
+		while(e)
+		{
+			v[vi++] = e->value;
+			e = e->next;
+		}
+	}
+}
+
+void clear(hash_table* hasht)
+{
+	char* str[hasht->size];
+	unsigned int i;
+	list_keys(hasht, str, hasht->size);
+	int size = hasht->size;
+	for(i = 0; i < size; i++)
+	{
+		free(erase(hasht, str[i]));
+	}
+}
+
+void destroy(hash_table* hasht)
+{
+	clear(hasht);
+	free(hasht->storage);
+	free(hasht);
 }
 
