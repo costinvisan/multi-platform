@@ -3,19 +3,7 @@
 #include <string.h>
 #include "hashtable.h"
 #include "queue.h"
-
-#define EMPTY_STRING ""
-#define DEFINE_ARG "-D"
-#define DIR_ARG "-I"
-#define OUT_ARG "-O"
-#define DELIM_ARGS "=" 
-#define DEF_ARG_CODE 0
-#define DEF_ARG_CODE_U 1
-#define DIR_ARG_CODE 2
-#define DIR_ARG_CODE_U 3
-#define IN_FILE_CODE 4
-#define OUT_FILE_CODE 5
-#define OUT_FILE_CODE_U 6
+#include "defines.h"
 
 void definition_arguments(char *str, hash_table *define)
 {	
@@ -23,7 +11,7 @@ void definition_arguments(char *str, hash_table *define)
 
 	ptr = strtok(str, DELIM_ARGS);
 	key = malloc(strlen(ptr) * sizeof(char) + 1);
-	strcpy(key, str);
+	strcpy(key, ptr);
 
 	ptr = strtok(NULL, DELIM_ARGS);
 	if (ptr == NULL)
@@ -40,7 +28,7 @@ void definition_arguments(char *str, hash_table *define)
 	put(define, key, value);
 }
 
-int get_code(char *argv)
+int get_code_args(char *argv)
 {
 	if (strstr(argv, DEFINE_ARG) != NULL)
 	{
@@ -80,6 +68,18 @@ int get_code(char *argv)
 	}
 }
 
+int get_code_directive(char *line)
+{
+	if (strstr(line, KEY_WORD_DEFINE) != NULL)
+	{
+		return DEFINE_CODE;
+	}
+	else
+	{
+		return IGNORE_CODE;
+	}
+}
+
 int get_count_directores(int argc, char **argv)
 {
 	int count = 0;
@@ -109,14 +109,13 @@ void parse_arguments(
 	hash_table *define
 )
 {
-	printf("%d\n", directories_count);
 	char *substr;
 	directories[0] = malloc(directories_count * sizeof(char *) + 1);
 	int iterator_dir = 0;
 
 	for (int i = 1; i < argc; ++i)
 	{
-		switch(get_code(argv[i]))
+		switch(get_code_args(argv[i]))
 		{
 			case DEF_ARG_CODE_U: ;
 				substr = malloc((strlen(argv[i]) - 2) * sizeof(char) + 1);
@@ -162,38 +161,231 @@ void parse_arguments(
 	}
 }
 
+void add_define_map(char *line, hash_table *define)
+{
+	char *ptr, *key, *value;
+	int count_aux = 1;
+	ptr = strtok(line, DELIM_FILE);
+	
+	ptr = strtok(NULL, DELIM_FILE);
+	key = malloc(strlen(ptr) * sizeof(char) + 1);
+	strcpy(key, ptr);
+	
+	ptr = strtok(NULL, NEW_LINE);
+	value = malloc(strlen(ptr) * sizeof(char) + 1);
+	strcpy(value, ptr);
+
+	put(define, key, value);
+	strcpy(line, TERMINATOR);
+}
+
+char* check_substr_in_string(char *s, char *delim)
+{
+    char *target = NULL;
+    char *start, *end;
+
+    if ( start = strstr( s, delim ) )
+    {
+        start += strlen( delim );
+        if ( end = strstr( start, delim) )
+        {
+            target = ( char * )malloc( end - start + 1 );
+            memcpy( target, start, end - start );
+            target[end - start] = '\0';
+        }
+    }
+
+    return target;
+}
+
+void insertString(char* destination, int pos, char* seed)
+{
+    char * strC;
+
+    strC = (char*)malloc(strlen(destination)+strlen(seed)+1);
+    strncpy(strC,destination,pos);
+    strC[pos] = '\0';
+    strcat(strC,seed);
+    strcat(strC,destination+pos);
+    strcpy(destination,strC);
+    free(strC);
+}
+
+void removeSubStr( char **str, const char *substr )
+{
+    size_t m1 = strlen(str[0]);
+    size_t m2 = strlen(substr);
+
+    if (!(m1 < m2))
+    {
+        for (char *p = str[0]; (p = strstr(p, substr)) != NULL; )
+        {
+            size_t n = m1 - ( p + m2 - str[0] );
+            memmove(p, p + m2, n + 1);
+        }
+    }
+}
+
+void replace_aux(char **line, char *key, char *value)
+{
+	char *pch = strstr(line[0], key);
+	if (pch != NULL)
+	{
+		insertString(pch, 0, value);
+		removeSubStr(line, key);
+		replace_aux(line, key, value);
+	}
+	
+}
+
+void replace_key_in_line(char *line, char *key, char *value)
+{
+
+	char *result = check_substr_in_string(line, "\"");
+	if (result != NULL)
+	{
+		char *pch = strstr(result, key);
+		if (pch != NULL)
+		{
+			removeSubStr(&line, result);
+			char *pch_sec = strstr(line, key);
+			if (pch_sec != NULL)
+			{
+				replace_aux(&line, key, value);
+			}
+			char *pch_third = strstr(line, "\"");
+			insertString(pch_third, 1, result);
+		}
+		else
+		{
+			replace_aux(&line, key, value);
+		}
+		free(result);
+	}
+	else
+	{
+		replace_aux(&line, key, value);
+	}
+}
+
+void replace_define(char *key, char*value, char ***lines_code, int count_lines)
+{
+	for (int i = 0; i < count_lines; ++i)
+	{
+		if (strstr(lines_code[0][i], KEY_WORD_UNDEFINE) != NULL
+			&& strstr(lines_code[0][i], key) != NULL)
+		{
+			strcpy(lines_code[0][i], TERMINATOR);
+			return;
+		}
+		replace_key_in_line(lines_code[0][i], key, value);
+	}
+}
+
+void read_and_write(
+	int directories_count,
+	char **directories,
+	char *in_file,
+	char *out_file,
+	hash_table *define
+)
+{
+	FILE *fd_in, *fd_out;
+	char buffer[BUFFER_LENGTH];
+
+	if (in_file != NULL)
+	{
+		fd_in = fopen(in_file, "r");
+		if (fd_in == NULL)
+			exit(EXIT_FAILURE);
+	}
+	else
+	{
+		fd_in = stdin;
+	}
+
+	if (out_file != NULL)
+	{
+		fd_out = fopen(out_file, "w");
+		if (fd_out == NULL)
+			exit(EXIT_FAILURE);
+	}
+	else
+	{
+		fd_out = stdout;
+	}
+
+	char **lines_code = malloc(sizeof(char *) * 32);
+	for (int i = 0; i < 32; ++i)
+	{
+		lines_code[i] = malloc(255 * sizeof(char));
+	}
+
+	int count_lines = 0;
+	while(fgets(buffer, sizeof(buffer), fd_in) != NULL)
+	{
+		switch(get_code_directive(buffer))
+		{
+			case DEFINE_CODE: ;
+				add_define_map(buffer, define);
+				break;
+		}
+		if (strcmp(buffer, NEW_LINE) != 0)
+		{
+			strcpy(lines_code[count_lines], buffer);
+			count_lines++;
+		}
+    }
+	
+	char* str[define->size];
+	unsigned int i;
+	list_keys(define, str, define->size);
+	for(i = 0; i < define->size; ++i)
+	{
+		replace_define(str[i], get(define, str[i]), &lines_code, count_lines);
+	}
+
+	for (int i = 0; i < count_lines; ++i)
+	{
+		fputs(lines_code[i], fd_out);
+	}
+
+	int to_free = count_lines > 32 ? count_lines : 32;
+	for (int i = 0; i < to_free; ++i)
+	{
+		free(lines_code[i]);
+	}
+	free(lines_code);
+
+    fclose(fd_in);
+	fclose(fd_out);
+}
+
 int main(int argc, char *argv[])
 {
 	hash_table *define = init_table(1024);
 	char **directories = NULL;
 	char *in_file = NULL, *out_file = NULL;
+	
 	int directories_count = get_count_directores(argc, argv);
 	parse_arguments(argc, argv, directories_count, &directories, &in_file, &out_file, define);
-	
-	char* str[define->size];
-	unsigned int i;
-	list_keys(define, str, define->size);
-	for(i = 0; i < define->size; i++)
-	{
-		printf("key: %s -> value: %s\n", str[i], (char *)get(define, str[i]));
-	}
+
+	read_and_write(directories_count, directories, in_file, out_file, define);
+
 	if (directories != NULL)
 	{
 		for (int i = 0; i < directories_count; ++i)
 		{
-			printf("%s\n", directories[i]);
 			free(directories[i]);
 		}
 		free(directories);
 	}
 	if (in_file != NULL)
 	{
-		printf("%s\n", in_file);
 		free(in_file);
 	}
 	if (out_file != NULL)
 	{
-		printf("%s\n", out_file);
 		free(out_file);
 	}
 
