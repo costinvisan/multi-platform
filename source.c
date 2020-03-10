@@ -83,8 +83,8 @@ int get_code_directive(char *line)
 int get_count_directores(int argc, char **argv)
 {
 	int count = 0;
-
-	for (int i = 1; i < argc; ++i)
+	int i;
+	for (i = 1; i < argc; ++i)
 	{
 		if (strstr(argv[i], DIR_ARG) != NULL)
 		{
@@ -112,8 +112,8 @@ void parse_arguments(
 	char *substr;
 	directories[0] = malloc(directories_count * sizeof(char *) + 1);
 	int iterator_dir = 0;
-
-	for (int i = 1; i < argc; ++i)
+	int i;
+	for (i = 1; i < argc; ++i)
 	{
 		switch(get_code_args(argv[i]))
 		{
@@ -218,7 +218,8 @@ void removeSubStr( char **str, const char *substr )
 
     if (!(m1 < m2))
     {
-        for (char *p = str[0]; (p = strstr(p, substr)) != NULL; )
+		char *p;
+        for (p = str[0]; (p = strstr(p, substr)) != NULL; )
         {
             size_t n = m1 - ( p + m2 - str[0] );
             memmove(p, p + m2, n + 1);
@@ -270,7 +271,8 @@ void replace_key_in_line(char *line, char *key, char *value)
 
 void replace_define(char *key, char*value, char ***lines_code, int count_lines)
 {
-	for (int i = 0; i < count_lines; ++i)
+	int i;
+	for (i = 0; i < count_lines; ++i)
 	{
 		if (strstr(lines_code[0][i], KEY_WORD_UNDEFINE) != NULL
 			&& strstr(lines_code[0][i], key) != NULL)
@@ -316,7 +318,8 @@ void read_and_write(
 	}
 
 	char **lines_code = malloc(sizeof(char *) * 32);
-	for (int i = 0; i < 32; ++i)
+	int i;
+	for (i = 0; i < 32; ++i)
 	{
 		lines_code[i] = malloc(255 * sizeof(char));
 	}
@@ -338,20 +341,19 @@ void read_and_write(
     }
 	
 	char* str[define->size];
-	unsigned int i;
 	list_keys(define, str, define->size);
 	for(i = 0; i < define->size; ++i)
 	{
 		replace_define(str[i], get(define, str[i]), &lines_code, count_lines);
 	}
 
-	for (int i = 0; i < count_lines; ++i)
+	for (i = 0; i < count_lines; ++i)
 	{
 		fputs(lines_code[i], fd_out);
 	}
 
 	int to_free = count_lines > 32 ? count_lines : 32;
-	for (int i = 0; i < to_free; ++i)
+	for (i = 0; i < to_free; ++i)
 	{
 		free(lines_code[i]);
 	}
@@ -374,7 +376,8 @@ int main(int argc, char *argv[])
 
 	if (directories != NULL)
 	{
-		for (int i = 0; i < directories_count; ++i)
+		int i;
+		for (i = 0; i < directories_count; ++i)
 		{
 			free(directories[i]);
 		}
